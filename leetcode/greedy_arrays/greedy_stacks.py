@@ -5,6 +5,16 @@ Pattern:
 
 Maintaining ordering -> Monotonic stack
 
+<-More greedy good stack problems->
+Minimum Cost Tree From Leaf Values
+Sum of Subarray Minimums
+Online Stock Span
+Score of Parentheses
+Next Greater Element II
+Next Greater Element I
+Largest Rectangle in Histogram
+Trapping Rain Water
+
 """
 
 
