@@ -25,22 +25,26 @@ class Leetcode131:
     """
 
     def partition(self, s: str) -> List[List[str]]:
-        res = []
-        
-        def ispalin(word: str):
-            return word == word[::-1]
-        
-        # r represents remaining string left
-        def dfs(r: str, path: List[str]):
-            if not r:
-                res.append(path)
+        res : List[str] = []
+        curr : List[List[str]] = []
+        def ispalin(start : int, end : int) -> bool:
+            while start < end:
+                if s[start] != s[end]:
+                    return False 
+                start += 1
+                end -= 1            
+            return True 
+            
+        def dfs(index : int):
+            if index >= len(s):
+                res.append(curr[:])
                 return 
-            # choosing a prefix
-            for i in range(1, 1+len(r)):
-                prefix = r[:i]
-                postfix = r[i:]
-                if ispalin(prefix): #continue searching other prefixes
-                    dfs(postfix, path+[prefix])
+            
+            for end in range(index, 1+len(s)):
+                if ispalin(index, end): #continue searching other prefixes
+                    curr.append(s[index:end+1])
+                    dfs(end+1)
+                    curr.pop()
         
-        dfs(s, [])
+        dfs(0)
         return res
