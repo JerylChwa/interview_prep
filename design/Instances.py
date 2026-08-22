@@ -161,10 +161,10 @@ class DistributedSystemMonitor:
 
         while self.minheap and self.minheap[0][0] <= current_time: # Current instance expired already
             # Check groundtruth
-            heap_ttl, id = heapq.heappop(self.minheap)
-            true_ttl = self.instances[id]
+            heap_expiry, id = heapq.heappop(self.minheap)
+            true_expiry = self.instances[id]
 
-            if heap_ttl == true_ttl: # Matches ground truth
+            if heap_expiry == true_expiry: # Matches ground truth
                 instance_obj = self.instances[id]
                 instance_obj.status = Status.EXPIRED
                 self.live.remove(id)
@@ -173,5 +173,142 @@ class DistributedSystemMonitor:
             self.clock.set_alarm(self.minheap[0][0])
             
 
+
+"""
+Answer below
+"""
+
+import heapq
+from enum import Enum
+
+
+class Status(Enum):
+    LIVE = 1
+    EXPIRED = 2
+    UNINIT = 3
+
+
+class Clock:
+    def get_current_timestamp(self) -> int:
+        pass
+
+    def set_alarm(self, timestamp: int) -> None:
+        pass
+
+
+class Instance:
+    def __init__(self, instance_id, expiry):
+        self.id = instance_id
+        self.expiry = expiry
+        self.status = Status.LIVE
+        self.version = 0
+
+
+class DistributedSystemMonitor:
+    def __init__(self, clock: Clock):
+        self.clock = clock
+
+        # (expiry, sequence, instance_id, version)
+        self.min_heap = []
+
+        self.instances = {}
+        self.live = set()
+
+        # Unique tie breaker for heap
+        self.sequence = 0
+
+
+    def register_instance(self, instance_id, ttl):
+        now = self.clock.get_current_timestamp()
+        expiry = now + ttl
+
+        instance = Instance(instance_id, expiry)
+
+        self.instances[instance_id] = instance
+        self.live.add(instance_id)
+
+        self._push(instance)
+        self._schedule_next_alarm()
+
+
+    def renew_instance(self, instance_id, ttl):
+        # Chosen semantics:
+        # unknown ID behaves like register
+        if instance_id not in self.instances:
+            self.register_instance(instance_id, ttl)
+            return
+
+        instance = self.instances[instance_id]
+
+        instance.expiry = self.clock.get_current_timestamp() + ttl
+        instance.version += 1
+        instance.status = Status.LIVE
+
+        self.live.add(instance_id)
+
+        self._push(instance)
+        self._schedule_next_alarm()
+
+
+    def get_live_instances(self):
+        return self.live
+
+
+    def get_instance_status(self, instance_id):
+        if instance_id not in self.instances:
+            return Status.UNINIT
+
+        return self.instances[instance_id].status
+
+
+    def on_alarm(self):
+        now = self.clock.get_current_timestamp()
+
+        while self.min_heap and self.min_heap[0][0] <= now:
+            expiry, _, instance_id, version = heapq.heappop(
+                self.min_heap
+            )
+
+            instance = self.instances[instance_id]
+
+            # stale heap entry
+            if version != instance.version:
+                continue
+
+            # Current expiry really occurred
+            instance.status = Status.EXPIRED
+            self.live.discard(instance_id)
+
+        self._schedule_next_alarm()
+
+
+    def _push(self, instance):
+        self.sequence += 1
+
+        heapq.heappush(
+            self.min_heap,
+            (
+                instance.expiry,
+                self.sequence,
+                instance.id,
+                instance.version,
+            )
+        )
+
+
+    def _schedule_next_alarm(self):
+        # Remove stale entries sitting at the top
+        while self.min_heap:
+            expiry, _, instance_id, version = self.min_heap[0]
+
+            instance = self.instances[instance_id]
+
+            if version == instance.version:
+                break
+
+            heapq.heappop(self.min_heap)
+
+        if self.min_heap:
+            self.clock.set_alarm(self.min_heap[0][0])
         
 
